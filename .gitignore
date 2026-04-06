@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# python
+__pycache__/
+*.pyc
+
+# virtual env
+.venv/
+
+# secrets
+.env
+api_key.txt
