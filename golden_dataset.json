@@ -1,0 +1,517 @@
+{
+  "_comment": "Golden dataset for interpretation_agent evaluation. 'scenarios' are multi-turn conversations from the course PDF. 'targeted_cases' are single-turn stress tests with explicit prior_state to isolate specific failure modes. In expected_extracted_fields, null means 'should not be set from this message' (non-overwrite check).",
+  "required_fields_priority": ["alert", "breathing_issues", "temperature_f", "urination_8h", "drinking", "current_medication"],
+
+  "targeted_cases": [
+    {
+      "id": "tc_01",
+      "category": "implied-field",
+      "description": "alert='no' implied by behavior, not stated directly",
+      "prior_state": {
+        "age_months": 48, "fever": "yes", "vomiting": null, "temperature_f": null,
+        "alert": null, "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "He's just staring at the wall and won't look at me when I call his name.",
+      "expected_extracted_fields": {
+        "alert": "no",
+        "temperature_f": null, "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "fever": null, "vomiting": null, "rash": null, "neck_pain": null,
+        "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 48, "fever": "yes", "vomiting": null, "temperature_f": null,
+        "alert": "no", "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "Unresponsiveness is described behaviorally, not with the word 'responding'. Model must infer alert='no'. Weak models may leave it null waiting for explicit wording."
+    },
+    {
+      "id": "tc_02",
+      "category": "ambiguous-value",
+      "description": "drinking boundary: 'barely sipping' is 'some', not 'no'",
+      "prior_state": {
+        "age_months": 36, "fever": "yes", "vomiting": "once", "temperature_f": 102.1,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "She's barely sipping, just a few drops of water here and there, but she's not refusing it.",
+      "expected_extracted_fields": {
+        "drinking": "some",
+        "temperature_f": null, "alert": null, "breathing_issues": null,
+        "urination_8h": null, "current_medication": null, "medication_last_dose": null,
+        "fever": null, "vomiting": null, "rash": null, "neck_pain": null,
+        "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 36, "fever": "yes", "vomiting": "once", "temperature_f": 102.1,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "Minimal but present fluid intake → 'some', not 'no'. 'not refusing it' is the key phrase. A model that maps any low intake to 'no' will fail this."
+    },
+    {
+      "id": "tc_03",
+      "category": "non-overwrite-trap",
+      "description": "Vague follow-up should not overwrite previously set fields",
+      "prior_state": {
+        "age_months": 72, "fever": "yes", "vomiting": "once", "temperature_f": 101.5,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "He seems about the same, not much has changed in the last few minutes.",
+      "expected_extracted_fields": {
+        "temperature_f": null, "alert": null, "breathing_issues": null,
+        "urination_8h": null, "drinking": null, "current_medication": null,
+        "medication_last_dose": null, "fever": null, "vomiting": null,
+        "rash": null, "neck_pain": null, "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 72, "fever": "yes", "vomiting": "once", "temperature_f": 101.5,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "No new clinical information in this message. All extracted fields must be null. A failing model will hallucinate values (e.g. re-confirming alert='yes' or drinking='some') from context rather than from this message alone."
+    },
+    {
+      "id": "tc_04",
+      "category": "medication-disambiguation",
+      "description": "One-time fever dose ≠ current regular medication",
+      "prior_state": {
+        "age_months": 24, "fever": "yes", "vomiting": "none", "temperature_f": 100.8,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "yes", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "I gave her some children's Tylenol about an hour ago to bring the fever down, but she's not on any regular medications.",
+      "expected_extracted_fields": {
+        "current_medication": null,
+        "medication_last_dose": null,
+        "temperature_f": null, "alert": null, "breathing_issues": null,
+        "urination_8h": null, "drinking": null, "fever": null, "vomiting": null,
+        "rash": null, "neck_pain": null, "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 24, "fever": "yes", "vomiting": "none", "temperature_f": 100.8,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "yes", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "Tylenol was given as a one-time fever reducer, and the parent explicitly states no regular medications. current_medication should remain null. A failing model sets current_medication='Tylenol' or 'children's Tylenol'."
+    },
+    {
+      "id": "tc_05",
+      "category": "hedge-language",
+      "description": "Uncertain urination report should not set urination_8h",
+      "prior_state": {
+        "age_months": 18, "fever": "yes", "vomiting": null, "temperature_f": 103.0,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "I think he might have peed this afternoon, but honestly I wasn't really watching so I'm not totally sure.",
+      "expected_extracted_fields": {
+        "urination_8h": null,
+        "temperature_f": null, "alert": null, "breathing_issues": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "fever": null, "vomiting": null, "rash": null, "neck_pain": null,
+        "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 18, "fever": "yes", "vomiting": null, "temperature_f": 103.0,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "Parent explicitly expresses uncertainty. urination_8h should stay null — the agent should ask again rather than assume 'yes'. A failing model sets urination_8h='yes' based on 'this afternoon'."
+    },
+    {
+      "id": "tc_06",
+      "category": "multi-field-dump",
+      "description": "Four distinct fields extracted from one message",
+      "prior_state": {
+        "age_months": 60, "fever": "yes", "vomiting": null, "temperature_f": null,
+        "alert": null, "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "Her temperature is 102.4, she has a rash on her stomach, she hasn't peed since this morning, and she's breathing really fast.",
+      "expected_extracted_fields": {
+        "temperature_f": 102.4,
+        "rash": "yes",
+        "urination_8h": "no",
+        "breathing_issues": "yes",
+        "alert": null, "drinking": null, "current_medication": null,
+        "medication_last_dose": null, "fever": null, "vomiting": null,
+        "neck_pain": null, "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 60, "fever": "yes", "vomiting": null, "temperature_f": 102.4,
+        "alert": null, "breathing_issues": "yes", "urination_8h": "no",
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": "yes", "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "All four extractions must be correct simultaneously. 'hasn't peed since this morning' → urination_8h='no'. 'breathing really fast' → breathing_issues='yes'. Partial credit not sufficient — all four must match."
+    },
+    {
+      "id": "tc_07",
+      "category": "valid-overwrite",
+      "description": "drinking changes from 'yes' to 'no' — this overwrite IS correct",
+      "prior_state": {
+        "age_months": 84, "fever": "yes", "vomiting": "once", "temperature_f": 101.0,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": "yes",
+        "drinking": "yes", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "Actually he just threw up everything he drank and is now refusing to take anything at all.",
+      "expected_extracted_fields": {
+        "drinking": "no",
+        "vomiting": null,
+        "temperature_f": null, "alert": null, "breathing_issues": null,
+        "urination_8h": null, "current_medication": null, "medication_last_dose": null,
+        "fever": null, "rash": null, "neck_pain": null, "age_months": null,
+        "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 84, "fever": "yes", "vomiting": "once", "temperature_f": 101.0,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": "yes",
+        "drinking": "no", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "The non-overwrite rule applies to null (don't erase with null). A new explicit value SHOULD overwrite the old one. drinking must update from 'yes' to 'no'. vomiting should remain true (already set, 'threw up' confirms but doesn't change it — extracted as null to avoid redundant set)."
+    },
+    {
+      "id": "tc_08",
+      "category": "implied-field",
+      "description": "breathing_issues='yes' implied by described sound (stridor)",
+      "prior_state": {
+        "age_months": 30, "fever": "yes", "vomiting": null, "temperature_f": 102.8,
+        "alert": "yes", "breathing_issues": null, "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "She's making a high-pitched whistling sound every time she breathes in.",
+      "expected_extracted_fields": {
+        "breathing_issues": "yes",
+        "temperature_f": null, "alert": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "fever": null, "vomiting": null, "rash": null, "neck_pain": null,
+        "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 30, "fever": "yes", "vomiting": null, "temperature_f": 102.8,
+        "alert": "yes", "breathing_issues": "yes", "urination_8h": null,
+        "drinking": "some", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "Stridor (inspiratory whistling) is an abnormal breathing sound and a clear breathing issue, even without the word 'trouble breathing'. Model must recognize the symptom description. Weak models may leave breathing_issues=null since the word 'trouble' is absent."
+    },
+    {
+      "id": "tc_09",
+      "category": "vague-numeric",
+      "description": "Uncertain temperature reading should not be extracted as a value",
+      "prior_state": {
+        "age_months": 48, "fever": "yes", "vomiting": "none", "temperature_f": null,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": "yes",
+        "drinking": "yes", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "The thermometer showed something around 100, maybe a little bit more, it was hard to read.",
+      "expected_extracted_fields": {
+        "temperature_f": null,
+        "alert": null, "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "fever": null, "vomiting": null, "rash": null, "neck_pain": null,
+        "age_months": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 48, "fever": "yes", "vomiting": "none", "temperature_f": null,
+        "alert": "yes", "breathing_issues": "no", "urination_8h": "yes",
+        "drinking": "yes", "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "Parent expresses explicit uncertainty about the reading. temperature_f requires a specific numeric value — 'around 100, maybe more' is not specific enough to record. A failing model extracts 100.0 or 100.5. The agent should follow up for a precise reading."
+    },
+    {
+      "id": "tc_10",
+      "category": "age-conversion",
+      "description": "Age expressed as years+half must convert to months",
+      "prior_state": {
+        "age_months": null, "fever": null, "vomiting": null, "temperature_f": null,
+        "alert": null, "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "caregiver_message": "She just turned two and a half last month. She has a high fever and won't stop crying.",
+      "expected_extracted_fields": {
+        "age_months": 30,
+        "fever": "yes",
+        "temperature_f": null, "alert": null, "breathing_issues": null,
+        "urination_8h": null, "drinking": null, "current_medication": null,
+        "medication_last_dose": null, "vomiting": null, "rash": null,
+        "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_cumulative_state": {
+        "age_months": 30, "fever": "yes", "vomiting": null, "temperature_f": null,
+        "alert": null, "breathing_issues": null, "urination_8h": null,
+        "drinking": null, "current_medication": null, "medication_last_dose": null,
+        "rash": null, "neck_pain": null, "fever_duration_days": null
+      },
+      "expected_is_complete": false,
+      "notes": "2.5 years = 30 months. 'high fever' → fever=true but no numeric value given so temperature_f=null. 'won't stop crying' might seem like alert information but it is actually a sign of normal responsiveness (crying = alert) — however this is ambiguous enough that alert=null is acceptable; the agent should ask explicitly."
+    }
+  ],
+
+  "scenarios": [
+    {
+      "id": "scenario_1",
+      "description": "Moderate fever (101.8), single vomit, responsive child on amoxicillin — home management outcome",
+      "turns": [
+        {
+          "turn": 1,
+          "caregiver_message": "My 6-year-old has a fever, threw up once, and looks really wiped out. I'm not sure what to do tonight.",
+          "expected_extracted_fields": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "alert": null,
+            "breathing_issues": null,
+            "temperature_f": null,
+            "urination_8h": null,
+            "drinking": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_cumulative_state": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "alert": null,
+            "breathing_issues": null,
+            "temperature_f": null,
+            "urination_8h": null,
+            "drinking": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_next_required_field": "alert",
+          "expected_is_complete": false,
+          "notes": "'looks really wiped out' is vague fatigue, not unresponsiveness — should NOT set alert. vomiting=True is explicit ('threw up once')."
+        },
+        {
+          "turn": 2,
+          "caregiver_message": "Temp is 101.8. He's tired but answers me. No breathing issues. He's sipping water, not much though. He's been on medication for a recent ear infection.",
+          "expected_extracted_fields": {
+            "temperature_f": 101.8,
+            "alert": "yes",
+            "breathing_issues": "no",
+            "drinking": "some",
+            "current_medication": null,
+            "medication_last_dose": null,
+            "urination_8h": null,
+            "fever": null,
+            "fever_duration_days": null,
+            "vomiting": null,
+            "rash": null,
+            "neck_pain": null,
+            "age_months": null
+          },
+          "expected_cumulative_state": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "temperature_f": 101.8,
+            "alert": "yes",
+            "breathing_issues": "no",
+            "drinking": "some",
+            "urination_8h": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_next_required_field": "urination_8h",
+          "expected_is_complete": false,
+          "notes": "'answers me' → alert='yes'. 'sipping water, not much' → drinking='some'. 'medication for a recent ear infection' gives no specific drug name → current_medication should remain null. The specific medication name must be asked as follow-up."
+        },
+        {
+          "turn": 3,
+          "caregiver_message": "He's on amoxicillin. Last dose was earlier tonight. Just vomited once. He peed earlier this evening.",
+          "expected_extracted_fields": {
+            "current_medication": "amoxicillin",
+            "medication_last_dose": "earlier tonight",
+            "urination_8h": "yes",
+            "vomiting": null,
+            "temperature_f": null,
+            "alert": null,
+            "breathing_issues": null,
+            "drinking": null,
+            "fever": null,
+            "fever_duration_days": null,
+            "rash": null,
+            "neck_pain": null,
+            "age_months": null
+          },
+          "expected_cumulative_state": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "temperature_f": 101.8,
+            "alert": "yes",
+            "breathing_issues": "no",
+            "drinking": "some",
+            "urination_8h": "yes",
+            "current_medication": "amoxicillin",
+            "medication_last_dose": "earlier tonight",
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_next_required_field": null,
+          "expected_is_complete": true,
+          "notes": "'peed earlier this evening' → urination_8h='yes' (recent enough). 'Just vomited once' reconfirms vomiting but should NOT change existing vomiting=true. All 6 required fields now filled → is_complete=True."
+        }
+      ]
+    },
+    {
+      "id": "scenario_2",
+      "description": "High fever (103.5), barely responsive, not drinking, no urination — ER outcome",
+      "turns": [
+        {
+          "turn": 1,
+          "caregiver_message": "My 6-year-old has a fever, threw up, and looks really wiped out. I'm worried.",
+          "expected_extracted_fields": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "alert": null,
+            "breathing_issues": null,
+            "temperature_f": null,
+            "urination_8h": null,
+            "drinking": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_cumulative_state": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "alert": null,
+            "breathing_issues": null,
+            "temperature_f": null,
+            "urination_8h": null,
+            "drinking": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_next_required_field": "alert",
+          "expected_is_complete": false,
+          "notes": "Same as scenario_1 turn_1. 'looks really wiped out' is not sufficient to set alert — needs explicit responsiveness information."
+        },
+        {
+          "turn": 2,
+          "caregiver_message": "Temp is 103.5. He's barely responding, just lying there. He doesn't want to drink. Also, there's been a stomach virus going around his school this week.",
+          "expected_extracted_fields": {
+            "temperature_f": 103.5,
+            "alert": "no",
+            "drinking": "no",
+            "breathing_issues": null,
+            "urination_8h": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "fever": null,
+            "fever_duration_days": null,
+            "vomiting": null,
+            "rash": null,
+            "neck_pain": null,
+            "age_months": null
+          },
+          "expected_cumulative_state": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "temperature_f": 103.5,
+            "alert": "no",
+            "drinking": "no",
+            "breathing_issues": null,
+            "urination_8h": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_next_required_field": "breathing_issues",
+          "expected_is_complete": false,
+          "notes": "'barely responding, just lying there' → alert='no'. 'doesn't want to drink' → drinking='no'. School virus context is background info — no clinical field to set. breathing_issues is next in REQUIRED_FIELDS priority. NOTE: The sample scenario PDF shows the agent asked about urination next instead of breathing_issues — this is a discrepancy with the current REQUIRED_FIELDS priority order and may indicate the sample was generated with a different agent version."
+        },
+        {
+          "turn": 3,
+          "caregiver_message": "I don't think he's peed since this afternoon.",
+          "expected_extracted_fields": {
+            "urination_8h": "no",
+            "temperature_f": null,
+            "alert": null,
+            "drinking": null,
+            "breathing_issues": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "fever": null,
+            "fever_duration_days": null,
+            "vomiting": null,
+            "rash": null,
+            "neck_pain": null,
+            "age_months": null
+          },
+          "expected_cumulative_state": {
+            "age_months": 72,
+            "fever": "yes",
+            "vomiting": "once",
+            "temperature_f": 103.5,
+            "alert": "no",
+            "drinking": "no",
+            "urination_8h": "no",
+            "breathing_issues": null,
+            "current_medication": null,
+            "medication_last_dose": null,
+            "rash": null,
+            "neck_pain": null,
+            "fever_duration_days": null
+          },
+          "expected_next_required_field": "breathing_issues",
+          "expected_is_complete": false,
+          "notes": "'not since this afternoon' implies several hours without urination → urination_8h='no'. breathing_issues and current_medication still unknown. is_complete=False."
+        }
+      ]
+    }
+  ]
+}
