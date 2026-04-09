@@ -14,9 +14,10 @@ dist/
 venv/
 env/
 
-# Environment
+# Environment / secrets
 .env
 .env.local
+api_key.txt
 
 # IDE
 .vscode/
