@@ -132,35 +132,17 @@ class KnowledgeRetrievalAgent:
             "ungrounded": ungrounded,
         }
 
-    def get_red_flags(self, sctids: list[str]) -> dict:
-        """
-        Return any red flags triggered by the given concept IDs.
-        Always pass the full expanded sctid list (including ancestors)
-        from ground_symptom / ground_symptoms_batch.
-
-        Args:
-            sctids: List of SNOMED concept IDs
-
-        Returns:
-            {
-                "red_flags": [
-                    {
-                        "rule_id":      "RF_003",
-                        "description":  "Non-blanching petechial rash with fever",
-                        "disposition":  "ED_NOW",
-                        "triggered_by": "Petechiae (finding)"
-                    },
-                    ...
-                ],
-                "highest_disposition": "ED_NOW" | "URGENT_CARE" | "HOME" | None,
-                "has_red_flags": True | False
-            }
-        """
+    def get_red_flags(self, sctids: list[str], age_months: int) -> dict:
+        if age_months is None:
+            raise ValueError("age_months is required. Triage cannot proceed without patient age.")
+        
         with self._driver.session() as session:
             red_flags = queries.get_red_flags(session, sctids)
 
-        highest = self._highest_disposition(red_flags)
+        if age_months >= 3:
+            red_flags = [rf for rf in red_flags if rf["rule_id"] != "RF_001"]
 
+        highest = self._highest_disposition(red_flags)
         return {
             "red_flags":           red_flags,
             "highest_disposition": highest,

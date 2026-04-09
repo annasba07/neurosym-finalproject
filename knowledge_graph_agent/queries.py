@@ -22,7 +22,7 @@ def ground_symptom(session, text_mention: str) -> list[dict]:
         f"""
         // Match concept by synonym (case-insensitive)
         MATCH (c:{NodeLabel.CONCEPT})
-        WHERE any(s IN c.synonyms WHERE toLower(s) CONTAINS toLower($mention))
+        WHERE any(s IN c.synonyms WHERE toLower(s) = toLower($mention))
 
         // Walk IS_A chain to collect ancestors
         OPTIONAL MATCH path = (c)-[:{RelType.IS_A}*1..5]->(ancestor:{NodeLabel.CONCEPT})
