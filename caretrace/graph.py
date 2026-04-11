@@ -3,8 +3,13 @@
 Flow:
     START → interpret → normalize → evaluate_rules → route
     route:
-      disposition is set → explain → END
-      missing fields     → ask_followup → END (wait for next user turn)
+      disposition in {er_now, urgent_eval, home_monitor} → explain → END
+      disposition is None (unsupported / not enough data) → ask_followup → END
+
+Interpret writes into state["facts"] (Alex's nested vocab) and
+state["raw_symptoms"] (free-text for KG grounding). Normalize grounds
+those via the adapter (Neo4j → dict fallback) and collects red flags.
+Evaluate_rules runs Alex's rules_agent and merges with KG red flags.
 """
 
 from langgraph.graph import StateGraph, END

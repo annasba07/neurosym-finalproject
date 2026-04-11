@@ -89,36 +89,55 @@ def main():
 
 
 def _print_debug(state: dict):
-    """Print debug info: disposition, rules fired, key findings."""
+    """Print debug info: disposition, rule trace, facts, KG provenance."""
     print("\n--- DEBUG ---")
-    print(f"  Phase: {state.get('phase', '?')}")
-    print(f"  Disposition: {state.get('disposition', 'undecided')}")
-    print(f"  Turn: {state.get('turn', 0)}")
+    print(f"  Phase:       {state.get('phase', '?')}")
+    print(f"  Disposition: {state.get('disposition') or 'undecided'}")
+    print(f"  Turn:        {state.get('turn', 0)}")
+    print(f"  KG backend:  {state.get('kg_backend', '?')}")
+
+    facts = state.get("facts", {}) or {}
+    if facts:
+        print("  Facts:")
+        for k, v in facts.items():
+            print(f"    {k} = {v}")
 
     missing = state.get("missing_required", [])
     if missing:
-        print(f"  Missing fields: {', '.join(missing)}")
+        print(f"  Missing required facts: {', '.join(missing)}")
 
-    rules = state.get("rules_fired", [])
+    obs = state.get("observation_predicates", [])
+    if obs:
+        print(f"  Observations: {obs}")
+
+    concerns = state.get("concern_predicates", [])
+    if concerns:
+        print(f"  Concerns:     {concerns}")
+
+    rules = state.get("rules_triggered", [])
     if rules:
-        print("  Rules fired:")
+        print("  Rule trace:")
         for r in rules:
-            print(f"    [{r['category']}] {r['reason']}")
+            print(f"    - {r}")
+
+    red_flags = state.get("kg_red_flags", [])
+    if red_flags:
+        print("  Red flags:")
+        for f in red_flags:
+            src = f.get("source", "kg")
+            print(f"    [{src}] {f['rule_id']}: {f['description']} → {f['disposition']}")
+
+    grounded = state.get("grounded_concepts", [])
+    if grounded:
+        terms = [c.get("mention") or (c.get("concepts") or [{}])[0].get("fsn", "?") for c in grounded]
+        print(f"  Grounded:    {terms}")
 
     positives = state.get("key_positives", [])
     negatives = state.get("key_negatives", [])
     if positives:
-        print(f"  Key positives: {', '.join(positives)}")
+        print(f"  Key positives: {'; '.join(positives)}")
     if negatives:
-        print(f"  Key negatives: {', '.join(negatives)}")
-
-    med = state.get("medication_decision")
-    if med:
-        print(f"  Medication: {med.get('reason', 'N/A')}")
-
-    concepts = state.get("snomed_concepts", [])
-    if concepts:
-        print(f"  SNOMED concepts: {[c['term'] for c in concepts]}")
+        print(f"  Key negatives: {'; '.join(negatives)}")
 
     print("--- END DEBUG ---\n")
 

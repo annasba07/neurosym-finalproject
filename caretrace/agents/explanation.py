@@ -1,8 +1,8 @@
-"""Explanation agent — verbalizes the structured triage decision for caregivers.
+"""Explanation agent — verbalizes the structured decision for caregivers.
 
-The LLM receives the full decision object (disposition, rules fired,
-positives/negatives, thresholds, care plan) and turns it into natural,
-empathetic caregiver-facing language. It does NOT make clinical decisions.
+The LLM receives the full decision object (disposition, rule trace,
+positives/negatives, red flags) and turns it into natural, empathetic,
+caregiver-facing language. It does NOT make clinical decisions.
 """
 
 import os
@@ -10,7 +10,15 @@ import os
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 
-from caretrace.state import ClinicalState, FIELD_QUESTIONS
+from caretrace.state import ClinicalState, FACT_QUESTIONS
+
+
+# Human-readable labels for the caregiver-facing disposition line.
+DISPOSITION_LABELS = {
+    "er_now":       "GO TO THE EMERGENCY ROOM NOW",
+    "urgent_eval":  "SEE A DOCTOR URGENTLY (within the next few hours)",
+    "home_monitor": "SAFE TO MANAGE AT HOME WITH MONITORING",
+}
 
 
 EXPLAIN_SYSTEM_PROMPT = """\
@@ -19,24 +27,23 @@ You are a caring pediatric nurse providing triage guidance to a worried parent.
 You will receive a structured clinical decision. Your job is to turn it into
 clear, empathetic, actionable guidance. You must:
 
-1. State the recommendation clearly (go to ER now / see doctor urgently / safe to monitor at home)
-2. Explain WHY using the key findings provided — be specific
-3. List what to watch for (go-now thresholds)
-4. If home management: give the overnight care plan
-5. If medication info is available: include it
+1. State the recommendation clearly up front (ER now / urgent care / safe to monitor).
+2. Explain WHY using the key findings and red flags provided — be specific.
+3. List what to watch for that would mean going to the ER immediately.
+4. If home management: give a concise overnight care plan (fluids, rest, fever control).
+5. Keep it short — this is a triage summary, not a medical essay.
 
 Rules:
-- NEVER contradict the disposition — if the system says ER, you say ER
-- Use simple language — the caregiver is stressed and may not be medically trained
-- Be warm but direct — don't hedge on safety-critical advice
-- Keep it concise — this is a triage summary, not a medical textbook
-- End with reassurance appropriate to the situation
+- NEVER contradict the disposition — if the system says ER, you say ER.
+- Use simple language — the caregiver is stressed and may not be medically trained.
+- Be warm but direct — don't hedge on safety-critical advice.
+- End with brief reassurance appropriate to the situation.
 """
 
 FOLLOWUP_SYSTEM_PROMPT = """\
 You are a caring pediatric triage nurse collecting information from a worried parent.
 
-The system still needs some information to complete the assessment. Ask for the
+The system still needs information to complete the assessment. Ask for the
 missing information naturally and warmly. You may combine 1-2 questions if
 they flow naturally together, but don't overwhelm with too many questions at once.
 
@@ -45,7 +52,6 @@ Prioritize safety-critical questions first (alertness, breathing).
 
 
 def _get_llm():
-    """Get the LLM for explanation generation."""
     return ChatGroq(
         model="llama-3.3-70b-versatile",
         temperature=0.3,
@@ -54,12 +60,11 @@ def _get_llm():
 
 
 def explain(state: ClinicalState) -> dict:
-    """LangGraph node: generate caregiver-facing explanation of the decision."""
+    """LangGraph node: generate the caregiver-facing explanation."""
     disposition = state.get("disposition")
     if disposition is None:
         return {}
 
-    # Build the decision summary for the LLM
     decision_summary = _build_decision_summary(state)
 
     llm = _get_llm()
@@ -70,55 +75,53 @@ def explain(state: ClinicalState) -> dict:
 
     return {
         "explanation": response.content,
-        "messages": [AIMessage(content=response.content)],
+        "messages":    [AIMessage(content=response.content)],
         "is_complete": True,
     }
 
 
 def ask_followup(state: ClinicalState) -> dict:
-    """LangGraph node: ask for missing information when disposition can't be determined."""
+    """LangGraph node: ask for missing facts when disposition is undecided."""
     missing = state.get("missing_required", [])
     if not missing:
         return {}
 
-    # Pick the highest-priority missing fields (max 2)
-    questions_to_ask = []
-    for field in missing[:2]:
-        q = FIELD_QUESTIONS.get(field)
+    # Take the top two missing facts by priority order
+    questions = []
+    for key in missing[:2]:
+        q = FACT_QUESTIONS.get(key)
         if q:
-            questions_to_ask.append(q)
+            questions.append(q)
 
-    if not questions_to_ask:
+    if not questions:
         return {}
 
-    # Build context about what we already know
     known_summary = _build_known_summary(state)
 
     llm = _get_llm()
     prompt = (
         f"What we know so far:\n{known_summary}\n\n"
         f"We still need to ask:\n"
-        + "\n".join(f"- {q}" for q in questions_to_ask)
+        + "\n".join(f"- {q}" for q in questions)
         + "\n\nGenerate a warm, natural follow-up message combining these questions."
     )
-
     response = llm.invoke([
         SystemMessage(content=FOLLOWUP_SYSTEM_PROMPT),
         HumanMessage(content=prompt),
     ])
 
-    return {
-        "messages": [AIMessage(content=response.content)],
-    }
+    return {"messages": [AIMessage(content=response.content)]}
 
+
+# ── Summary builders ──────────────────────────────────────────────────────────
 
 def _build_decision_summary(state: ClinicalState) -> str:
-    """Build a structured decision summary for the explanation LLM."""
-    lines = []
-    lines.append(f"DISPOSITION: {state.get('disposition', 'unknown').upper()}")
+    lines: list[str] = []
+    disposition = state.get("disposition", "")
+    label = DISPOSITION_LABELS.get(disposition, disposition.upper())
+    lines.append(f"DISPOSITION: {label}")
     lines.append("")
 
-    # Key findings
     positives = state.get("key_positives", [])
     negatives = state.get("key_negatives", [])
     if positives:
@@ -126,59 +129,69 @@ def _build_decision_summary(state: ClinicalState) -> str:
         for p in positives:
             lines.append(f"  - {p}")
     if negatives:
+        lines.append("")
         lines.append("REASSURING FINDINGS:")
         for n in negatives:
             lines.append(f"  - {n}")
 
-    # Rules fired
-    rules = state.get("rules_fired", [])
+    # Red-flag provenance — show which backend flagged what
+    red_flags = state.get("kg_red_flags", [])
+    if red_flags:
+        lines.append("")
+        lines.append("RED FLAGS TRIGGERED:")
+        for f in red_flags:
+            src = f.get("source", "kg")
+            lines.append(f"  - [{src}] {f['description']} ({f['disposition']})")
+
+    # Rules trace (Alex's + KG merged) — useful context for the LLM
+    rules = state.get("rules_triggered", [])
     if rules:
         lines.append("")
-        lines.append("CLINICAL REASONING:")
+        lines.append("RULE TRACE:")
         for r in rules:
-            lines.append(f"  - [{r['category']}] {r['reason']}")
+            lines.append(f"  - {r}")
 
-    # Medication decision
-    med = state.get("medication_decision")
-    if med and med.get("allowed"):
+    # Raw clinical context
+    facts_bits = []
+    if state.get("age_months") is not None:
+        age = state["age_months"]
+        facts_bits.append(
+            f"age: {age // 12}y {age % 12}m" if age >= 24 else f"age: {age} months"
+        )
+    if state.get("temperature_f") is not None:
+        facts_bits.append(f"temp: {state['temperature_f']}°F")
+    if state.get("current_medication"):
+        facts_bits.append(f"medication: {state['current_medication']}")
+    if facts_bits:
         lines.append("")
-        lines.append(f"MEDICATION: {med.get('reason', '')}")
-
-    # Go-now thresholds
-    thresholds = state.get("go_now_thresholds", [])
-    if thresholds:
-        lines.append("")
-        lines.append("GO TO ER IMMEDIATELY IF:")
-        for t in thresholds:
-            lines.append(f"  - {t}")
-
-    # Overnight plan
-    plan = state.get("overnight_plan", [])
-    if plan:
-        lines.append("")
-        lines.append("OVERNIGHT CARE PLAN:")
-        for step in plan:
-            lines.append(f"  - {step}")
+        lines.append("CONTEXT: " + ", ".join(facts_bits))
 
     return "\n".join(lines)
 
 
 def _build_known_summary(state: ClinicalState) -> str:
-    """Summarize what we know so far for follow-up context."""
-    facts = []
+    """Friendly summary of what we already know, for the follow-up prompt."""
+    bits: list[str] = []
     if state.get("age_months") is not None:
         age = state["age_months"]
-        if age >= 24:
-            facts.append(f"Age: {age // 12} years old")
-        else:
-            facts.append(f"Age: {age} months old")
+        bits.append(f"Age: {age // 12} years old" if age >= 24 else f"Age: {age} months old")
     if state.get("temperature_f") is not None:
-        facts.append(f"Temperature: {state['temperature_f']}°F")
-    if state.get("fever"):
-        facts.append(f"Fever: {state['fever']}")
-    if state.get("vomiting"):
-        facts.append(f"Vomiting: {state['vomiting']}")
-    if state.get("medications"):
-        facts.append(f"Medications: {state['medications']}")
+        bits.append(f"Temperature: {state['temperature_f']}°F")
 
-    return "\n".join(facts) if facts else "Limited information so far."
+    facts = state.get("facts", {}) or {}
+    if "fever" in facts:
+        bits.append(f"Fever: {facts['fever']}")
+    if "alert" in facts:
+        bits.append(f"Alertness: {facts['alert']}")
+    if "intake" in facts:
+        bits.append(f"Drinking: {facts['intake']}")
+    if "urination" in facts:
+        bits.append(f"Urination: {facts['urination']}")
+    if "vomiting" in facts:
+        bits.append(f"Vomiting: {facts['vomiting']}")
+    if "breathing" in facts:
+        bits.append(f"Breathing: {facts['breathing']}")
+    if state.get("current_medication"):
+        bits.append(f"Medication: {state['current_medication']}")
+
+    return "\n".join(bits) if bits else "Limited information so far."

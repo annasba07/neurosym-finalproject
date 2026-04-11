@@ -1,7 +1,7 @@
 """Scripted end-to-end run of both clinical scenarios through the live LangGraph.
 
-Uses the real Groq LLM for interpretation + explanation, pyDatalog for rules,
-and the placeholder KG for concept lookup. Simulates a multi-turn conversation.
+Uses the real Groq LLM for interpretation + explanation, Alex's plain-Python
+rules engine, and the KG adapter (Neo4j if reachable, dict fallback otherwise).
 
 Run with: python -m scenarios.run_live
 """
@@ -25,17 +25,42 @@ def _print_state_summary(state: dict) -> None:
     print("\n  --- state snapshot ---")
     print(f"    disposition : {state.get('disposition') or 'undecided'}")
     print(f"    phase       : {state.get('phase')}")
+    print(f"    kg backend  : {state.get('kg_backend')}")
+
+    facts = state.get("facts") or {}
+    if facts:
+        print(f"    facts       : {facts}")
+
     missing = state.get("missing_required", [])
     if missing:
         print(f"    missing     : {missing}")
-    rules = state.get("rules_fired", [])
+
+    obs = state.get("observation_predicates", [])
+    if obs:
+        print(f"    observations: {obs}")
+
+    concerns = state.get("concern_predicates", [])
+    if concerns:
+        print(f"    concerns    : {concerns}")
+
+    rules = state.get("rules_triggered", [])
     if rules:
-        print("    rules fired :")
+        print("    rule trace  :")
         for r in rules:
-            print(f"      [{r['category']}] {r['reason']}")
-    concepts = state.get("snomed_concepts", [])
-    if concepts:
-        print(f"    snomed      : {[c['term'] for c in concepts]}")
+            print(f"      - {r}")
+
+    red_flags = state.get("kg_red_flags", [])
+    if red_flags:
+        print("    red flags   :")
+        for f in red_flags:
+            src = f.get("source", "kg")
+            print(f"      [{src}] {f['rule_id']} → {f['disposition']}")
+
+    grounded = state.get("grounded_concepts", [])
+    if grounded:
+        mentions = [c.get("mention", "?") for c in grounded]
+        print(f"    grounded    : {mentions}")
+
     print("  ----------------------")
 
 
@@ -47,14 +72,13 @@ def run_scenario(title: str, messages: list[str], thread_id: str) -> None:
     app, config = create_app(thread_id=thread_id)
     state = initial_state()
 
-    for i, msg in enumerate(messages, 1):
+    for msg in messages:
         _print_bubble("user", msg)
 
         state["messages"] = [HumanMessage(content=msg)]
         result = app.invoke(state, config)
         state.update(result)
 
-        # Find and print the latest AI message
         msgs = result.get("messages", [])
         for m in reversed(msgs):
             if isinstance(m, AIMessage):
@@ -74,15 +98,13 @@ def main():
         print("GROQ_API_KEY not set. Add it to .env first.")
         return
 
-    # Scenario 1: straightforward home management case (from Scenarios file)
     scenario_1 = [
         "Hi, my 6-year-old has had a fever since yesterday and threw up once at dinner. I'm worried.",
-        "Temperature is 101.8 right now. He's awake and talking to me, breathing fine. "
-        "He's sipping water but not eating much.",
-        "He just took a little pee about 3 hours ago. He's on amoxicillin for an ear infection.",
+        "Temperature is 101.8 right now. He's awake and talking to me normally, breathing fine. "
+        "He's drinking water like he usually does, just not eating as much solid food.",
+        "He just peed about 3 hours ago, normal amount. He's on amoxicillin for an ear infection.",
     ]
 
-    # Scenario 2: ER referral case
     scenario_2 = [
         "My 6-year-old is really sick. High fever and she threw up once.",
         "Her temperature is 103.5. She's really out of it — barely responding when I call her. "
@@ -92,12 +114,12 @@ def main():
     ]
 
     run_scenario(
-        "SCENARIO 1 — Moderate fever, alert, drinking → expect HOME",
+        "SCENARIO 1 — Moderate fever, alert, drinking → expect home_monitor",
         scenario_1,
         thread_id="live-s1",
     )
     run_scenario(
-        "SCENARIO 2 — High fever, not alert, not drinking → expect ER",
+        "SCENARIO 2 — High fever, reduced alertness, not drinking → expect er_now",
         scenario_2,
         thread_id="live-s2",
     )
