@@ -24,14 +24,24 @@ DISPOSITION_LABELS = {
 EXPLAIN_SYSTEM_PROMPT = """\
 You are a caring pediatric nurse providing triage guidance to a worried parent.
 
-You will receive a structured clinical decision. Your job is to turn it into
-clear, empathetic, actionable guidance. You must:
+You will receive a structured clinical decision with supporting evidence. Your
+job is to turn it into clear, empathetic, actionable guidance. You must:
 
 1. State the recommendation clearly up front (ER now / urgent care / safe to monitor).
-2. Explain WHY using the key findings and red flags provided — be specific.
-3. List what to watch for that would mean going to the ER immediately.
-4. If home management: give a concise overnight care plan (fluids, rest, fever control).
+2. Explain WHY using the key findings provided — be specific about what the
+   caregiver reported vs. what the system checked for but did not find.
+3. Include the GO-NOW THRESHOLDS section EXACTLY as provided — these are
+   safety-critical escalation triggers and must not be paraphrased loosely.
+4. If home management: include the OVERNIGHT PLAN items provided — these are
+   evidence-based care steps. You may reword for warmth but do not omit any.
 5. Keep it short — this is a triage summary, not a medical essay.
+
+Epistemic honesty:
+- Clearly distinguish what the caregiver reported ("you told me...") from
+  what the system assessed ("based on the symptoms described...").
+- If any facts are marked as STILL UNKNOWN, acknowledge them: "We don't yet
+  know about X, so please watch for..."
+- Do NOT present inferred or assumed information as certain.
 
 Rules:
 - NEVER contradict the disposition — if the system says ER, you say ER.
@@ -122,9 +132,29 @@ def _build_decision_summary(state: ClinicalState) -> str:
     lines.append(f"DISPOSITION: {label}")
     lines.append("")
 
+    # ── Epistemic status: what was reported vs. what is unknown ──────────
+    facts = state.get("facts") or {}
+    from caretrace.state import REQUIRED_FACTS_FOR_HOME
+    reported = []
+    for k, v in facts.items():
+        reported.append(f"{k}={v}")
+    if reported:
+        lines.append("CAREGIVER REPORTED (confirmed facts):")
+        for r in reported:
+            lines.append(f"  - {r}")
+
+    still_unknown = state.get("missing_required", [])
+    if still_unknown:
+        lines.append("")
+        lines.append("STILL UNKNOWN (not yet reported by caregiver):")
+        for u in still_unknown:
+            lines.append(f"  - {u}")
+
+    # ── Key positives/negatives ──────────────────────────────────────────
     positives = state.get("key_positives", [])
     negatives = state.get("key_negatives", [])
     if positives:
+        lines.append("")
         lines.append("KEY CONCERNS:")
         for p in positives:
             lines.append(f"  - {p}")
@@ -150,6 +180,23 @@ def _build_decision_summary(state: ClinicalState) -> str:
         lines.append("RULE TRACE:")
         for r in rules:
             lines.append(f"  - {r}")
+
+    # ── Go-now thresholds (deterministic, from CPG) ──────────────────────
+    go_now = state.get("go_now_thresholds", [])
+    if go_now:
+        lines.append("")
+        lines.append("GO-NOW THRESHOLDS (include these verbatim — they are safety-critical):")
+        for t in go_now:
+            lines.append(f"  • {t}")
+
+    # ── Overnight plan (deterministic, for home_monitor only) ────────────
+    if disposition == "home_monitor":
+        overnight = state.get("overnight_plan", [])
+        if overnight:
+            lines.append("")
+            lines.append("OVERNIGHT CARE PLAN (include all of these):")
+            for o in overnight:
+                lines.append(f"  • {o}")
 
     # Raw clinical context
     facts_bits = []

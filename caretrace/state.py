@@ -77,6 +77,8 @@ class ClinicalState(TypedDict):
     explanation: Optional[str]
     key_positives: list
     key_negatives: list
+    go_now_thresholds: list              # deterministic escalation triggers from CPG
+    overnight_plan: list                 # deterministic overnight care items from CPG
 
     # -- Control --------------------------------------------------------------
     is_complete: bool
@@ -145,6 +147,8 @@ def initial_state() -> ClinicalState:
         explanation=None,
         key_positives=[],
         key_negatives=[],
+        go_now_thresholds=[],
+        overnight_plan=[],
         is_complete=False,
         phase="intake",
     )

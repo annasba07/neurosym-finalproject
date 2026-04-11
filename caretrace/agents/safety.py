@@ -113,6 +113,51 @@ def _validate_red_flag(flag: dict, state: dict) -> bool:
     return validator(state)
 
 
+def _build_safety_netting(facts: dict, state: dict) -> tuple[list[str], list[str]]:
+    """Build deterministic go-now thresholds and overnight plan items from facts.
+
+    These come from the Fever CPG and are passed to the explanation agent as
+    structured data — the LLM must include them verbatim rather than inventing
+    its own thresholds.
+    """
+    go_now: list[str] = []
+    overnight: list[str] = []
+
+    # ── Go-now thresholds (always include these) ─────────────────────────
+    # These are the escalation triggers from the Seattle Children's Fever CPG.
+    if facts.get("alert") != "reduced":
+        go_now.append("Child becomes hard to wake or stops responding")
+    if facts.get("breathing") != "difficulty":
+        go_now.append("Breathing becomes fast, labored, or difficult")
+    if facts.get("seizure") != "yes":
+        go_now.append("Child has a seizure (shaking, stiffening, eyes rolling)")
+    go_now.append("Repeated vomiting — cannot keep any fluids down")
+    go_now.append("No urination for 8+ hours")
+    go_now.append("Fever rises above 104°F")
+    go_now.append("New rash that does not blanch (turn white) when pressed")
+    go_now.append("You feel something is seriously wrong — trust your instincts")
+
+    # ── Overnight plan (only for home_monitor) ───────────────────────────
+    overnight.append("Offer small sips of clear fluids (water, electrolyte solution) every 15–20 minutes")
+    overnight.append("Do not force food — fluids are the priority")
+    overnight.append("Keep clothing light and room comfortable")
+    overnight.append("Use only ONE fever medicine at the correct dose for age/weight")
+
+    age = state.get("age_months")
+    if age is not None and age < 6:
+        overnight.append("Only acetaminophen is safe under 6 months — do NOT use ibuprofen")
+    elif age is not None and age < 24:
+        overnight.append("Acetaminophen or ibuprofen — use one, not both")
+
+    if state.get("current_medication"):
+        overnight.append(f"Child is currently on {state['current_medication']} — check for interactions before giving fever medicine")
+
+    overnight.append("Check on your child every 2–3 hours overnight")
+    overnight.append("Call your pediatrician first thing in the morning for a follow-up")
+
+    return go_now, overnight
+
+
 def _build_key_findings(facts: dict, rules_triggered: list, red_flags: list) -> tuple[list, list]:
     """Build caregiver-facing positive/negative bullets from the symbolic trace."""
     positives: list[str] = []
@@ -219,7 +264,10 @@ def evaluate_rules(state: ClinicalState) -> dict:
     # ── 6. Key positives/negatives for the explanation layer ────────────────
     positives, negatives = _build_key_findings(facts, rules_triggered, red_flags)
 
-    # ── 7. Phase ─────────────────────────────────────────────────────────────
+    # ── 7. Structured go-now thresholds + overnight plan items ────────────
+    go_now_thresholds, overnight_plan = _build_safety_netting(facts, state)
+
+    # ── 8. Phase ─────────────────────────────────────────────────────────────
     if disposition is not None:
         phase = "plan_ready"
     elif missing:
@@ -236,5 +284,7 @@ def evaluate_rules(state: ClinicalState) -> dict:
         "missing_required":       missing,
         "key_positives":          positives,
         "key_negatives":          negatives,
+        "go_now_thresholds":      go_now_thresholds,
+        "overnight_plan":         overnight_plan,
         "phase":                  phase,
     }
