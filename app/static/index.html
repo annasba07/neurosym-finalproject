@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CareTrace — Neurosymbolic Pediatric Triage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --berkeley-blue: #003262;
+    --cal-gold: #FDB515;
+    --gold-light: #FDE68A;
+    --gold-dim: rgba(253,181,21,0.15);
+    --blue-light: #dbeafe;
+    --blue-mid: #1e4d8c;
+    --blue-dim: rgba(0,50,98,0.07);
+
+    --bg: #f9f7f4;
+    --surface: #ffffff;
+    --surface2: #f3f0eb;
+    --parchment: #faf8f3;
+
+    --border: rgba(0,50,98,0.1);
+    --border2: rgba(0,50,98,0.18);
+
+    --text: #1a1a2e;
+    --muted: #4b5563;
+    --dim: #9ca3af;
+
+    --accent: #003262;
+    --accent-dim: rgba(0,50,98,0.08);
+
+    --warn: #b45309;
+    --warn-bg: #fef3c7;
+    --warn-border: rgba(180,83,9,0.3);
+
+    --danger: #b91c1c;
+    --danger-bg: #fee2e2;
+    --danger-border: rgba(185,28,28,0.3);
+
+    --safe: #065f46;
+    --safe-bg: #d1fae5;
+    --safe-border: rgba(6,95,70,0.3);
+
+    --mono: 'DM Mono', monospace;
+    --serif: 'EB Garamond', serif;
+    --sans: 'Source Sans 3', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 58px;
+    background: var(--berkeley-blue);
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--cal-gold);
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .logo-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-style: italic;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+  }
+  .logo-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(253,181,21,0.85);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    border: 1px solid rgba(253,181,21,0.35);
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+  .header-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    text-align: right;
+    line-height: 1.6;
+  }
+  .header-meta strong {
+    color: rgba(253,181,21,0.9);
+    font-weight: 400;
+  }
+
+  /* ── Scenario bar ── */
+  .scenario-bar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 28px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .scenario-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+  .scenario-pill {
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .scenario-pill:hover {
+    border-color: var(--berkeley-blue);
+    color: var(--berkeley-blue);
+    background: var(--accent-dim);
+  }
+  .reset-pill {
+    margin-left: auto;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+  }
+  .reset-pill:hover { color: var(--muted); border-color: var(--border2); }
+
+  /* ── Main layout ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Chat panel ── */
+  .chat-panel {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--parchment);
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .bubble-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .bubble-wrap.user { align-items: flex-end; }
+  .bubble-wrap.agent { align-items: flex-start; }
+
+  .bubble {
+    max-width: 76%;
+    padding: 11px 15px;
+    border-radius: 12px;
+    line-height: 1.65;
+    font-size: 14px;
+  }
+  .bubble.user {
+    background: var(--berkeley-blue);
+    color: #fff;
+    border-bottom-right-radius: 3px;
+  }
+  .bubble.agent {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-bottom-left-radius: 3px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .bubble.agent.er-now {
+    border-color: var(--danger-border);
+    background: var(--danger-bg);
+  }
+  .bubble.agent.home-monitor {
+    border-color: var(--safe-border);
+    background: var(--safe-bg);
+  }
+  .bubble.agent.urgent-eval {
+    border-color: var(--warn-border);
+    background: var(--warn-bg);
+  }
+
+  .bubble-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    padding: 0 4px;
+  }
+
+  .system-msg {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    padding: 4px 0;
+    letter-spacing: 0.06em;
+  }
+
+  /* typing indicator */
+  .typing { display: flex; align-items: center; gap: 5px; padding: 12px 15px; }
+  .typing span {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--dim);
+    animation: blink 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,60%,100%{opacity:0.25} 30%{opacity:1} }
+
+  /* ── Input area ── */
+  .input-area {
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    background: var(--surface);
+  }
+  .input-area textarea {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 9px 13px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    resize: none;
+    line-height: 1.5;
+    max-height: 120px;
+    min-height: 40px;
+    outline: none;
+    transition: border-color 0.15s;
+    scrollbar-width: none;
+  }
+  .input-area textarea:focus { border-color: var(--berkeley-blue); }
+  .input-area textarea::placeholder { color: var(--dim); }
+  .send-btn {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    border: none;
+    background: var(--cal-gold);
+    color: var(--berkeley-blue);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, opacity 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .send-btn:hover { background: #e8a800; }
+  .send-btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* ── Trace panel ── */
+  .trace-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+  }
+  .trace-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .trace-section { display: flex; flex-direction: column; gap: 8px; }
+  .trace-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--berkeley-blue);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--cal-gold);
+    font-weight: 500;
+  }
+
+  /* disposition */
+  .disp-block {
+    padding: 11px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-align: center;
+    transition: all 0.35s;
+    background: var(--surface2);
+  }
+  .disp-undecided { color: var(--dim); }
+  .disp-home_monitor { background: var(--safe-bg); border-color: var(--safe-border); color: var(--safe); }
+  .disp-urgent_eval { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+  .disp-er_now { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+
+  /* pipeline steps */
+  .pipeline { display: flex; flex-direction: column; gap: 0; }
+  .pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    position: relative;
+  }
+  .pipe-step.active { background: var(--blue-dim); }
+  .pipe-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--dim);
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .pipe-step.done .pipe-dot { background: var(--berkeley-blue); border-color: var(--berkeley-blue); }
+  .pipe-step.active .pipe-dot {
+    border-color: var(--cal-gold);
+    background: var(--cal-gold);
+    box-shadow: 0 0 0 3px rgba(253,181,21,0.25);
+    animation: pipePulse 1s infinite;
+  }
+  @keyframes pipePulse { 0%,100%{box-shadow:0 0 0 3px rgba(253,181,21,0.2)} 50%{box-shadow:0 0 0 7px rgba(253,181,21,0)} }
+  .pipe-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    transition: color 0.2s;
+  }
+  .pipe-step.done .pipe-label { color: var(--berkeley-blue); }
+  .pipe-step.active .pipe-label { color: var(--text); font-weight: 500; }
+  .pipe-connector {
+    width: 1.5px;
+    height: 10px;
+    background: var(--border);
+    margin-left: 13px;
+  }
+  .pipe-connector.done { background: var(--berkeley-blue); opacity: 0.3; }
+
+  /* facts */
+  .fact-grid { display: flex; flex-direction: column; gap: 4px; }
+  .fact-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 9px;
+    border-radius: 5px;
+    background: var(--surface2);
+    animation: fadeIn 0.3s ease;
+    border: 1px solid var(--border);
+  }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(3px)} to{opacity:1; transform:none} }
+  .fact-key { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .fact-val { font-family: var(--mono); font-size: 11px; font-weight: 500; }
+  .fv-yes, .fv-normal { color: var(--safe); }
+  .fv-reduced, .fv-once { color: var(--warn); }
+  .fv-none, .fv-difficulty, .fv-reduced-alert { color: var(--danger); }
+  .fv-default { color: var(--berkeley-blue); }
+
+  /* rule trace */
+  .trace-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .trace-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    background: var(--surface2);
+    animation: fadeIn 0.25s ease;
+  }
+  .trace-chip.obs { border-color: rgba(0,50,98,0.3); color: var(--berkeley-blue); background: var(--blue-dim); }
+  .trace-chip.concern { border-color: var(--warn-border); color: var(--warn); background: var(--warn-bg); }
+  .trace-chip.decision { border-color: rgba(253,181,21,0.5); color: #92600a; background: var(--gold-dim); }
+  .trace-chip.fallback { border-color: var(--danger-border); color: var(--danger); background: var(--danger-bg); }
+  .trace-chip.safe { border-color: var(--safe-border); color: var(--safe); background: var(--safe-bg); }
+
+  /* red flags */
+  .flag-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 9px;
+    border-radius: 5px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    animation: fadeIn 0.3s ease;
+  }
+  .flag-id { font-family: var(--mono); font-size: 10px; color: var(--danger); }
+  .flag-desc { font-size: 11px; color: var(--muted); flex: 1; }
+
+  /* missing */
+  .missing-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px dashed var(--border2);
+    color: var(--muted);
+    margin: 2px;
+    background: var(--surface2);
+  }
+
+  /* demographics */
+  .demo-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .demo-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    animation: fadeIn 0.3s ease;
+  }
+  .demo-chip span { color: var(--berkeley-blue); font-weight: 500; }
+
+  .empty-hint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    font-style: italic;
+  }
+
+  /* welcome */
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+  }
+  .welcome-seal {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--berkeley-blue);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--cal-gold);
+    font-style: italic;
+    opacity: 0.2;
+  }
+  .welcome-title {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-style: italic;
+    color: var(--berkeley-blue);
+    opacity: 0.35;
+  }
+  .welcome-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    opacity: 0.7;
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-name">CareTrace</span>
+    <span class="logo-tag">neurosymbolic · pediatric triage</span>
+  </div>
+  <div class="header-meta">
+    <strong>UC Berkeley</strong> DATASCI 290 · Spring 2026<br>
+    Annas · Yoko · David · Alex
+  </div>
+</header>
+
+<div class="scenario-bar">
+  <span class="scenario-label">Scenarios</span>
+  <button class="scenario-pill" onclick="loadScenario('mild')">😌 mild fever</button>
+  <button class="scenario-pill" onclick="loadScenario('dehydration')">💧 reduced intake</button>
+  <button class="scenario-pill" onclick="loadScenario('danger')">🚨 lethargy + no intake</button>
+  <button class="scenario-pill" onclick="loadScenario('infant')">👶 infant fever</button>
+  <button class="scenario-pill" onclick="loadScenario('seizure')">⚡ seizure</button>
+  <button class="reset-pill" onclick="resetAll()">↺ reset</button>
+</div>
+
+<div class="workspace">
+
+  <!-- Chat panel -->
+  <div class="chat-panel">
+    <div class="chat-messages" id="chat">
+      <div class="welcome">
+        <div class="welcome-seal">C</div>
+        <div class="welcome-title">Ready to triage</div>
+        <div class="welcome-sub">describe a child's symptoms to begin, or pick a scenario above</div>
+      </div>
+    </div>
+    <div class="input-area">
+      <textarea
+        id="msg-input"
+        rows="1"
+        placeholder="Describe your child's symptoms…"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMsg()" title="Send">↑</button>
+    </div>
+  </div>
+
+  <!-- Trace panel -->
+  <div class="trace-panel">
+    <div class="trace-scroll">
+
+      <div class="trace-section">
+        <div class="trace-section-label">Disposition</div>
+        <div class="disp-block disp-undecided" id="disp-badge">undecided</div>
+      </div>
+
+      <div class="trace-section">
+        <div class="trace-section-label">Pipeline</div>
+        <div class="pipeline">
+          <div class="pipe-step" id="pipe-1">
+            <div class="pipe-dot"></div>
+            <div class="pipe-label">LLM extract facts</div>
+          </div>
+          <div class="pipe-connector" id="conn-1"></div>
+          <div class="pipe-step" id="pipe-2">
+            <div class="pipe-dot"></div>
+            <div class="pipe-label">KG normalize + ground</div>
+          </div>
+          <div class="pipe-connector" id="conn-2"></div>
+          <div class="pipe-step" id="pipe-3">
+            <div class="pipe-dot"></div>
+            <div class="pipe-label">Symbolic rules engine</div>
+          </div>
+          <div class="pipe-connector" id="conn-3"></div>
+          <div class="pipe-step" id="pipe-4">
+            <div class="pipe-dot"></div>
+            <div class="pipe-label">LLM verbalize reply</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="trace-section">
+        <div class="trace-section-label">Demographics</div>
+        <div class="demo-row" id="demo-panel">
+          <span class="empty-hint">—</span>
+        </div>
+      </div>
+
+      <div class="trace-section">
+        <div class="trace-section-label">Extracted facts</div>
+        <div class="fact-grid" id="facts-panel">
+          <span class="empty-hint">awaiting first message…</span>
+        </div>
+      </div>
+
+      <div class="trace-section" id="missing-section">
+        <div class="trace-section-label">Missing required</div>
+        <div id="missing-panel"><span class="empty-hint">—</span></div>
+      </div>
+
+      <div class="trace-section">
+        <div class="trace-section-label">Rule trace</div>
+        <div class="trace-chips" id="trace-panel">
+          <span class="empty-hint">—</span>
+        </div>
+      </div>
+
+      <div class="trace-section" id="flags-section" style="display:none;">
+        <div class="trace-section-label">Red flags</div>
+        <div id="flags-panel"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SCENARIOS = {
+  mild: [
+    "My 6-year-old has had a fever since yesterday. Temperature is about 101.8°F. He's awake and talking to me normally, breathing fine.",
+    "He's drinking water like usual and peed about 3 hours ago. He threw up once at dinner. He's on amoxicillin for an ear infection."
+  ],
+  dehydration: [
+    "My 6-year-old has a 101.8°F fever. She's awake and alert, breathing fine.",
+    "She's only taking small sips of water — not really drinking much. She's been urinating normally though."
+  ],
+  danger: [
+    "My 6-year-old has a 103.5°F fever and she's really out of it — barely responding when I call her name.",
+    "She won't drink anything at all. Breathing seems okay but she hasn't peed in about 8 hours."
+  ],
+  infant: [
+    "My 2-month-old has a temperature of 101°F. She's eating a little less than usual but still taking some milk.",
+    "She's awake but fussy. Breathing looks normal."
+  ],
+  seizure: [
+    "My 2-year-old had a fever and then started shaking all over for about 30 seconds. He seems really drowsy now."
+  ]
+};
+
+let clientState = {};
+let threadId = 'demo-' + Math.random().toString(36).slice(2, 8);
+let isLoading = false;
+let scenarioQueue = [];
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMsg();
+  }
+}
+
+function resetAll() {
+  clientState = {};
+  threadId = 'demo-' + Math.random().toString(36).slice(2, 8);
+  scenarioQueue = [];
+  isLoading = false;
+
+  document.getElementById('chat').innerHTML = `
+    <div class="welcome">
+      <div class="welcome-seal">C</div>
+      <div class="welcome-title">Ready to triage</div>
+      <div class="welcome-sub">describe a child's symptoms to begin, or pick a scenario above</div>
+    </div>`;
+  document.getElementById('msg-input').value = '';
+  autoResize(document.getElementById('msg-input'));
+  document.getElementById('send-btn').disabled = false;
+
+  setDisp(null);
+  setPipelineState(0);
+  document.getElementById('demo-panel').innerHTML = '<span class="empty-hint">—</span>';
+  document.getElementById('facts-panel').innerHTML = '<span class="empty-hint">awaiting first message…</span>';
+  document.getElementById('missing-panel').innerHTML = '<span class="empty-hint">—</span>';
+  document.getElementById('trace-panel').innerHTML = '<span class="empty-hint">—</span>';
+  document.getElementById('flags-section').style.display = 'none';
+  document.getElementById('flags-panel').innerHTML = '';
+}
+
+function loadScenario(key) {
+  resetAll();
+  scenarioQueue = [...(SCENARIOS[key] || [])];
+  if (scenarioQueue.length) {
+    document.getElementById('msg-input').value = scenarioQueue.shift();
+    autoResize(document.getElementById('msg-input'));
+    document.getElementById('msg-input').focus();
+  }
+}
+
+function addBubble(role, text, dispClass) {
+  const chat = document.getElementById('chat');
+  const welcome = chat.querySelector('.welcome');
+  if (welcome) welcome.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bubble-wrap ' + role;
+
+  const meta = document.createElement('div');
+  meta.className = 'bubble-meta';
+  meta.textContent = role === 'user' ? 'caregiver' : 'CareTrace';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + role + (dispClass ? ' ' + dispClass : '');
+  bubble.textContent = text;
+
+  wrap.appendChild(meta);
+  wrap.appendChild(bubble);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return bubble;
+}
+
+function addSystem(text) {
+  const chat = document.getElementById('chat');
+  const el = document.createElement('div');
+  el.className = 'system-msg';
+  el.textContent = text;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function showTyping() {
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'bubble-wrap agent';
+  wrap.id = 'typing-wrap';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble agent';
+  bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  wrap.appendChild(bubble);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-wrap');
+  if (el) el.remove();
+}
+
+function setDisp(disp) {
+  const badge = document.getElementById('disp-badge');
+  badge.className = 'disp-block disp-' + (disp || 'undecided');
+  badge.textContent = disp || 'undecided';
+}
+
+function setPipelineState(step) {
+  for (let i = 1; i <= 4; i++) {
+    const pipe = document.getElementById('pipe-' + i);
+    const conn = document.getElementById('conn-' + i);
+    pipe.className = 'pipe-step';
+    if (conn) conn.className = 'pipe-connector';
+
+    if (i < step) {
+      pipe.classList.add('done');
+      if (conn) conn.classList.add('done');
+    } else if (i === step) {
+      pipe.classList.add('active');
+    }
+  }
+}
+
+function updateTrace(data) {
+  const demoPanel = document.getElementById('demo-panel');
+  const demos = [];
+  if (data.age_months != null) {
+    const yrs = Math.floor(data.age_months / 12);
+    const mos = data.age_months % 12;
+    const label = yrs > 0 ? (mos > 0 ? `${yrs}y ${mos}mo` : `${yrs}yo`) : `${mos}mo`;
+    demos.push(`age: <span>${label}</span>`);
+  }
+  if (data.temperature_f != null) {
+    demos.push(`temp: <span>${data.temperature_f}°F</span>`);
+  }
+  demoPanel.innerHTML = demos.length
+    ? demos.map(d => `<div class="demo-chip">${d}</div>`).join('')
+    : '<span class="empty-hint">—</span>';
+
+  const factsPanel = document.getElementById('facts-panel');
+  const facts = data.facts || {};
+  const factKeys = Object.keys(facts).filter(k => facts[k] && facts[k] !== 'unknown');
+  if (factKeys.length) {
+    factsPanel.innerHTML = factKeys.map(k => {
+      const v = facts[k];
+      const cls = getFactClass(k, v);
+      return `<div class="fact-row"><span class="fact-key">${k}</span><span class="fact-val ${cls}">${v}</span></div>`;
+    }).join('');
+  } else {
+    factsPanel.innerHTML = '<span class="empty-hint">awaiting first message…</span>';
+  }
+
+  const missing = data.missing_required || [];
+  document.getElementById('missing-panel').innerHTML = missing.length
+    ? missing.map(m => `<span class="missing-tag">${m}</span>`).join('')
+    : '<span class="empty-hint">—</span>';
+
+  const tracePanel = document.getElementById('trace-panel');
+  const rules = data.rules_triggered || [];
+  if (rules.length) {
+    tracePanel.innerHTML = rules.map(r => {
+      const cls = chipClass(r);
+      const label = r.replace(/^(obs|concern|decision|safe|fallback):/, '');
+      return `<span class="trace-chip ${cls}">${label}</span>`;
+    }).join('');
+  } else {
+    tracePanel.innerHTML = '<span class="empty-hint">—</span>';
+  }
+
+  const flags = data.kg_red_flags || [];
+  const flagsSection = document.getElementById('flags-section');
+  if (flags.length) {
+    flagsSection.style.display = '';
+    document.getElementById('flags-panel').innerHTML = flags.map(f =>
+      `<div class="flag-row">
+        <span class="flag-id">[${f.source || 'kg'}] ${f.rule_id}</span>
+        <span class="flag-desc">${f.description || ''}</span>
+        <span class="fact-val fv-none">${f.disposition}</span>
+      </div>`
+    ).join('');
+  } else {
+    flagsSection.style.display = 'none';
+  }
+}
+
+function getFactClass(key, val) {
+  if (val === 'yes' || val === 'normal') return 'fv-' + val;
+  if (val === 'none') return 'fv-none';
+  if (val === 'reduced') return 'fv-reduced';
+  if (val === 'once') return 'fv-once';
+  if (val === 'difficulty') return 'fv-difficulty';
+  if (key === 'alert' && val === 'reduced') return 'fv-reduced-alert';
+  return 'fv-default';
+}
+
+function chipClass(rule) {
+  if (rule.startsWith('obs:')) return 'obs';
+  if (rule.startsWith('concern:')) return 'concern';
+  if (rule.startsWith('decision:')) return 'decision';
+  if (rule.startsWith('fallback:')) return 'fallback';
+  if (rule.startsWith('safe:')) return 'safe';
+  return '';
+}
+
+function dispBubbleClass(disp) {
+  if (disp === 'er_now') return 'er-now';
+  if (disp === 'home_monitor') return 'home-monitor';
+  if (disp === 'urgent_eval') return 'urgent-eval';
+  return '';
+}
+
+async function sendMsg() {
+  if (isLoading) return;
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  autoResize(input);
+  document.getElementById('send-btn').disabled = true;
+  isLoading = true;
+
+  addBubble('user', text);
+  showTyping();
+  setPipelineState(1);
+
+  const payload = {
+    message: text,
+    thread_id: threadId,
+    ...clientState
+  };
+
+  try {
+    const stepTimers = [
+      setTimeout(() => setPipelineState(2), 400),
+      setTimeout(() => setPipelineState(3), 900),
+      setTimeout(() => setPipelineState(4), 1500),
+    ];
+
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    stepTimers.forEach(t => clearTimeout(t));
+
+    if (!resp.ok) throw new Error('Server error: ' + resp.status);
+
+    const data = await resp.json();
+    removeTyping();
+    setPipelineState(5);
+
+    const dispClass = dispBubbleClass(data.disposition);
+    addBubble('agent', data.reply, dispClass);
+
+    setDisp(data.disposition);
+    updateTrace(data);
+
+    if (data.is_complete) addSystem('— triage complete —');
+
+    clientState = data.state_snapshot || {};
+
+    if (scenarioQueue.length && !data.is_complete) {
+      setTimeout(() => {
+        input.value = scenarioQueue.shift();
+        autoResize(input);
+        input.focus();
+      }, 600);
+    }
+
+  } catch (err) {
+    removeTyping();
+    setPipelineState(0);
+    addSystem('Error: ' + err.message + ' — is the server running?');
+  }
+
+  document.getElementById('send-btn').disabled = false;
+  isLoading = false;
+}
+</script>
+</body>
+</html>
