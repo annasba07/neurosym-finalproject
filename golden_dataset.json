@@ -95,8 +95,8 @@
       },
       "caregiver_message": "I gave her some children's Tylenol about an hour ago to bring the fever down, but she's not on any regular medications.",
       "expected_extracted_fields": {
-        "current_medication": null,
-        "medication_last_dose": null,
+        "current_medication": "Children's Tylenol",
+        "medication_last_dose": "about an hour ago",
         "temperature_f": null, "alert": null, "breathing_issues": null,
         "urination_8h": null, "drinking": null, "fever": null, "vomiting": null,
         "rash": null, "neck_pain": null, "age_months": null, "fever_duration_days": null
@@ -104,7 +104,7 @@
       "expected_cumulative_state": {
         "age_months": 24, "fever": "yes", "vomiting": "none", "temperature_f": 100.8,
         "alert": "yes", "breathing_issues": "no", "urination_8h": null,
-        "drinking": "yes", "current_medication": null, "medication_last_dose": null,
+        "drinking": "yes", "current_medication": "Children's Tylenol", "medication_last_dose": "about an hour ago",
         "rash": null, "neck_pain": null, "fever_duration_days": null
       },
       "expected_is_complete": false,
@@ -179,14 +179,14 @@
       "caregiver_message": "Actually he just threw up everything he drank and is now refusing to take anything at all.",
       "expected_extracted_fields": {
         "drinking": "no",
-        "vomiting": null,
+        "vomiting": "repeated",
         "temperature_f": null, "alert": null, "breathing_issues": null,
         "urination_8h": null, "current_medication": null, "medication_last_dose": null,
         "fever": null, "rash": null, "neck_pain": null, "age_months": null,
         "fever_duration_days": null
       },
       "expected_cumulative_state": {
-        "age_months": 84, "fever": "yes", "vomiting": "once", "temperature_f": 101.0,
+        "age_months": 84, "fever": "yes", "vomiting": "repeated", "temperature_f": 101.0,
         "alert": "yes", "breathing_issues": "no", "urination_8h": "yes",
         "drinking": "no", "current_medication": null, "medication_last_dose": null,
         "rash": null, "neck_pain": null, "fever_duration_days": null
