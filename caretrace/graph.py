@@ -23,9 +23,11 @@ from caretrace.agents.explanation import explain, ask_followup
 
 
 def _route_after_rules(state: ClinicalState) -> str:
-    """Conditional edge: decide whether to explain or ask follow-up."""
     disposition = state.get("disposition")
-    if disposition is not None:
+    missing = state.get("missing_required", [])
+    is_bright_line = "danger_red_flag" in state.get("concern_predicates", [])
+    
+    if disposition is not None and (not missing or is_bright_line):
         return "explain"
     return "ask_followup"
 

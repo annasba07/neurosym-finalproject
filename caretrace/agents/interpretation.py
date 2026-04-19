@@ -71,8 +71,11 @@ STRICT RULES:
 5. Age conversion: if given in years, convert to months (e.g. "6 years" → 72).
 6. Temperature conversion: if given in Celsius, convert to Fahrenheit.
 7. Vomiting: 'none' = no vomiting, 'once' = one episode, 'repeated' = more than once.
-8. For alertness: "alert", "talking", "responsive" → 'yes'; "lethargic", "out of it",
-   "barely responding", "hard to wake" → 'no'.
+8. For alertness: "alert", "talking", "responsive" → 'yes'; 
+   "lethargic", "unresponsive", "barely responding", "hard to wake", 
+   "won't wake up" → 'no'.
+   Ambiguous fatigue words like "tired", "wiped out", "exhausted", 
+   "sleepy" → null (do not extract — let the system ask).
 9. For drinking: "drinking normally" → 'yes'; "sipping", "a little", "not much" → 'some';
    "won't drink", "refusing fluids" → 'no'.
 """

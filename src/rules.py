@@ -22,7 +22,7 @@ def observation_predicates(facts):
     return preds
 
 
-def concern_predicates(obs):
+def concern_predicates(obs, facts):
     concerns = []
 
     # --- danger ---
@@ -49,7 +49,10 @@ def concern_predicates(obs):
 
     # --- fever amplification ---
     elif dehydration_score == 1 and "fever_present" in obs:
-        concerns.append("dehydration_concern")
+        if "no_urine" not in obs and facts.get("urination") == "normal":
+            pass  # normal urination cancels mild dehydration concern
+        else:
+            concerns.append("dehydration_concern")
 
     return concerns
 
@@ -90,7 +93,7 @@ def rules_agent(state):
     obs = observation_predicates(facts)
 
     # --- Layer 2: concern ---
-    concerns = concern_predicates(obs)
+    concerns = concern_predicates(obs, facts)
 
     # --- Layer 3: decision ---
     decision = decide(concerns, obs, facts)

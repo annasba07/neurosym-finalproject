@@ -247,7 +247,13 @@ def evaluate_rules(state: ClinicalState) -> dict:
 
     # If Alex voted home_monitor but we're missing required facts, it's not safe
     # to commit — route to ask_followup unless red flags also fired.
-    if merged == "home_monitor" and missing:
+    bright_line_flags = {"RF_001", "RF_002", "RF_006"}  # infant, seizure, breathing
+    has_bright_line = (
+        any(f.get("rule_id") in bright_line_flags for f in red_flags)
+        or "danger_red_flag" in state.get("concern_predicates", [])
+    )
+
+    if merged in ("er_now", "home_monitor", "urgent_eval") and missing and not has_bright_line:
         merged = "unsupported"
 
     # If everything is still 'unsupported' (no red flags, not enough data), we
